@@ -10,12 +10,13 @@
 <meta name="apple-mobile-web-app-title" content="Scorecard">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#12141c">
-<link rel="apple-touch-icon" href="icon-180.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png?v=2">
 <style id="css">
 :root {
   --bg: #f5f6f8; --surface: #ffffff; --ink: #14171f; --muted: #5a6270; --line: #e2e5ea;
-  --accent: #ffd400; --accent-ink: #14171f; --soft: #eef0f3;
+  /* Kept brand purples, sampled from the Kept one-pager. */
+  --accent: #8a3ddb; --accent-hover: #9b55e3; --accent-ink: #ffffff; --lavender: #c6a2f3; --soft: #eef0f3;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #0e1116; --surface: #171b22; --ink: #f2f4f7; --muted: #a2aab6; --line: #2b313c; --soft: #222833; }
@@ -36,6 +37,7 @@ button { cursor: pointer; }
 .seg button { border: 0; background: none; padding: 6px 13px; border-radius: 7px; font-weight: 600; font-size: 13px; color: var(--muted); }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
 .primary { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 700; }
+.primary:hover:not(:disabled) { background: var(--accent-hover); }
 .ghost { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; font-weight: 600; font-size: 13px; }
 
 /* Counter */
@@ -45,9 +47,9 @@ button { cursor: pointer; }
 .card-title { font-size: 12px; font-weight: 700; }
 .card-week { font-size: 12px; color: rgba(255,255,255,.65); white-space: nowrap; }
 .card-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
-.i { position: relative; flex: none; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 0; background: #ffd400; color: #14171f; font: italic 700 15px/22px Georgia, "Times New Roman", serif; text-align: center; }
+.i { position: relative; flex: none; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); font: italic 700 15px/22px Georgia, "Times New Roman", serif; text-align: center; }
 .i::before { content: ""; position: absolute; inset: -5px; }
-.i:hover { background: #ffe34d; }
+.i:hover { background: var(--accent-hover); }
 .brand-wrap { display: inline-flex; align-items: center; gap: 8px; }
 dialog.info { width: min(440px, calc(100vw - 16px)); max-height: calc(100vh - 16px); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); }
 dialog.info::backdrop { background: rgba(0,0,0,.5); }
@@ -60,7 +62,7 @@ dialog.info::backdrop { background: rgba(0,0,0,.5); }
 .info-item b { display: block; }
 .info-item span { color: var(--muted); }
 .info-rule { margin: 12px 0 0; padding: 9px 11px; border-radius: 8px; background: var(--soft); font-size: 13px; }
-.group { margin: 12px 0 3px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #ffd400; }
+.group { margin: 12px 0 3px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--lavender); }
 .row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
 .lbl { flex: 1; font-size: 13px; color: rgba(255,255,255,.88); min-width: 0; }
 .val { min-width: 30px; text-align: center; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -140,9 +142,9 @@ table.team tr.off td { color: var(--muted); }
 <body>
 <div id="app"></div>
 <!-- Bump v= after any change so browsers don't keep running an old copy. -->
-<script src="config.js?v=6"></script>
-<script src="core.js?v=6"></script>
-<script src="store.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="config.js?v=7"></script>
+<script src="core.js?v=7"></script>
+<script src="store.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
