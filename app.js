@@ -12,7 +12,7 @@
 
   let view = location.hash === '#dashboard' ? 'dashboard' : 'counter';
   let status = 'loading'; // loading | ok | noKey | badKey | offline
-  const dash = { period: 'week', person: 'all', sort: { setter: { id: 'meetingsBooked', dir: -1 }, closer: { id: 'signedDeals', dir: -1 } } };
+  const dash = { period: 'today', person: 'all', sort: { setter: { id: 'meetingsBooked', dir: -1 }, closer: { id: 'signedDeals', dir: -1 } } };
   let pipWindow = null;
   let lastDay = today();
   let lastLink = null; // { name, url } after adding someone or making a new link
@@ -23,15 +23,15 @@
   ];
   const roleText = (roles) => roles.map((r) => (r === 'setter' ? 'Setter' : 'Closer')).join(' + ');
 
-  function weekValues(p) {
-    const [from, to] = Core.periodRange('week', today());
-    return Core.sumRange(Store.counts()[p.id], from, to);
+  // The counter shows today only and starts fresh at midnight. Past days live on the Dashboard.
+  function todayValues(p) {
+    return Core.sumRange(Store.counts()[p.id], today(), today());
   }
 
   /* ---------- Counter card (used on the page and in the pop-out) ---------- */
   function cardHTML(p, inPip = false) {
-    const values = weekValues(p);
-    let html = `<div class="card-head"><span class="card-name"><span class="card-title">${esc(p.name)}</span><button class="i" data-act="info" aria-label="What each number means">i</button></span><span class="card-week">This week · ${Core.weekLabel(Core.weekStart(today()))}</span></div>`;
+    const values = todayValues(p);
+    let html = `<div class="card-head"><span class="card-name"><span class="card-title">${esc(p.name)}</span><button class="i" data-act="info" aria-label="What each number means">i</button></span><span class="card-week">Today · ${Core.dayLabel(today())}</span></div>`;
     let group = null;
     for (const m of metricsFor(p)) {
       if (m.group !== group) { group = m.group; html += `<div class="group">${group}</div>`; }
@@ -49,7 +49,7 @@
   function syncCounts() {
     const p = Store.current();
     if (!p) return;
-    const values = weekValues(p);
+    const values = todayValues(p);
     const docs = [document];
     if (pipWindow) docs.push(pipWindow.document);
     for (const doc of docs) {
@@ -171,6 +171,18 @@
     return `<div class="tbl"><table><thead><tr><th>Person</th>${head}</tr></thead><tbody>${body}</tbody>${foot}</table></div>`;
   }
 
+  // One row per day for the last week, today first, so quiet days show up as zeros.
+  function byDayTable(role, people) {
+    const t = today();
+    const cols = columns(role);
+    const head = cols.map((c) => `<th>${c.label}</th>`).join('');
+    const rows = Core.daysThrough(t, 7).map((d) => {
+      const tag = d === t ? '<span class="tag">today</span>' : '';
+      return `<tr><td>${Core.dayLabel(d)}${tag}</td>${cells(cols, groupTotal(people, d, d))}</tr>`;
+    }).join('');
+    return `<div class="tbl"><table><thead><tr><th>Day</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+
   function byWeekTable(role, people) {
     const t = today();
     const cols = columns(role);
@@ -205,12 +217,14 @@
     return `<section class="panel"><h2>${title}</h2>
       ${tiles}
       <h3>By person</h3>${byPersonTable(role, people, from, to)}
+      <h3>Last 7 days</h3>${byDayTable(role, people)}
       <h3>By week and month to date</h3>${byWeekTable(role, people)}
     </section>`;
   }
 
   function rangeLabel(from, to) {
     const t = today();
+    if (dash.period === 'today') return `Today · ${Core.dayLabel(t)}`;
     if (dash.period === 'week') return `This week · ${Core.weekLabel(Core.weekStart(t))}`;
     if (dash.period === 'mtd') return from === t ? `Month to date · ${Core.short(t)}` : `Month to date · ${Core.short(from)}–${Core.parseKey(t).getDate()}`;
     const first = Core.firstDay(Store.counts());
@@ -233,7 +247,7 @@
     const setters = scoped.filter((p) => p.roles.includes('setter'));
     const closers = scoped.filter((p) => p.roles.includes('closer'));
     const [from, to] = Core.periodRange(dash.period, today());
-    const periods = [['week', 'This week'], ['mtd', 'Month to date'], ['all', 'All time']];
+    const periods = [['today', 'Today'], ['week', 'This week'], ['mtd', 'Month to date'], ['all', 'All time']];
     const options = [`<option value="all">Everyone</option>`, ...people.map((p) => `<option value="${esc(p.id)}" ${p.id === dash.person ? 'selected' : ''}>${esc(p.name)}</option>`)].join('');
     return `<div class="filters">
         <div class="seg" role="group" aria-label="Period">${periods.map(([k, l]) => `<button data-act="period" data-p="${k}" aria-pressed="${dash.period === k}">${l}</button>`).join('')}</div>
@@ -513,7 +527,7 @@
   window.addEventListener('focus', refresh);
   document.addEventListener('visibilitychange', refresh);
 
-  // Rolls over on its own at midnight and on Monday, even if the page stays open.
+  // Starts the counter fresh at midnight, even if the page stays open.
   setInterval(() => {
     const now = today();
     if (now !== lastDay) { lastDay = now; render(); renderPip(); }

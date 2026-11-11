@@ -23,6 +23,7 @@
   const DEALS_RULE = 'Every deal runs through Outreach, Contact, Booked and Sat, wherever it came from. If a partner sent it, also tap Partner intros once.';
 
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const pad = (n) => String(n).padStart(2, '0');
   const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const parseKey = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
@@ -31,6 +32,7 @@
   const monthStart = (k) => k.slice(0, 8) + '01';
   const short = (k) => { const d = parseKey(k); return `${MONTHS[d.getMonth()]} ${d.getDate()}`; };
   const monthName = (k) => MONTHS[parseKey(k).getMonth()];
+  const dayLabel = (k) => `${DAYS[parseKey(k).getDay()]}, ${short(k)}`;
 
   // Weeks are labelled Mon to Fri, but weekend taps count toward that same week.
   function weekLabel(start) {
@@ -42,6 +44,7 @@
   }
 
   function periodRange(kind, today) {
+    if (kind === 'today') return [today, today];
     if (kind === 'week') { const s = weekStart(today); return [s, addDays(s, 6)]; }
     if (kind === 'mtd') return [monthStart(today), today];
     return ['0000-01-01', '9999-12-31'];
@@ -84,8 +87,15 @@
     return out;
   }
 
-  // A plus lands on today. A minus undoes the most recent tap in the current week,
-  // so a Monday mistake can still be fixed on Wednesday.
+  // The last n days through today, newest first.
+  function daysThrough(today, n) {
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(addDays(today, -i));
+    return out;
+  }
+
+  // The counter is daily: a plus lands on today and a minus only takes back today's taps.
+  // (The database's minus removes the latest tap this week, which is today's whenever today has one.)
   function bump(personCounts, metric, delta, today) {
     const days = personCounts;
     if (delta > 0) {
@@ -93,17 +103,13 @@
       days[today][metric] = (days[today][metric] || 0) + delta;
       return true;
     }
-    const start = weekStart(today);
-    const end = addDays(start, 6);
-    const candidates = Object.keys(days).filter((d) => d >= start && d <= end && (days[d][metric] || 0) > 0).sort().reverse();
-    if (!candidates.length) return false;
-    const d = candidates[0];
-    days[d][metric] -= 1;
-    if (days[d][metric] === 0) delete days[d][metric];
-    if (Object.keys(days[d]).length === 0) delete days[d];
+    if (!days[today] || !(days[today][metric] > 0)) return false;
+    days[today][metric] -= 1;
+    if (days[today][metric] === 0) delete days[today][metric];
+    if (Object.keys(days[today]).length === 0) delete days[today];
     return true;
   }
 
-  const api = { SETTER_METRICS, CLOSER_METRICS, CLOSER_RATES, DEALS_RULE, dateKey, parseKey, addDays, weekStart, monthStart, short, monthName, weekLabel, periodRange, sumRange, addInto, rate, firstDay, weeksThrough, bump };
+  const api = { SETTER_METRICS, CLOSER_METRICS, CLOSER_RATES, DEALS_RULE, dateKey, parseKey, addDays, weekStart, monthStart, short, monthName, dayLabel, weekLabel, periodRange, sumRange, addInto, rate, firstDay, weeksThrough, daysThrough, bump };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Core = api;
 })(typeof window !== 'undefined' ? window : globalThis);
