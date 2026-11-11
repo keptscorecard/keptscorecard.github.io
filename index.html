@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kept Scorecard</title>
+<!-- Home Screen: opens full screen like an app, with its own icon and short name. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Scorecard">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#12141c">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <style id="css">
 :root {
   --bg: #f5f6f8; --surface: #ffffff; --ink: #14171f; --muted: #5a6270; --line: #e2e5ea;
@@ -61,6 +69,7 @@ dialog.info::backdrop { background: rgba(0,0,0,.5); }
 .tap:disabled { opacity: .3; cursor: default; }
 .tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
 .tools label { display: inline-flex; align-items: center; gap: 5px; }
+.tools [data-act="homeScreen"] { flex-basis: 100%; max-width: 300px; padding: 11px 14px; }
 .hint { color: var(--muted); font-size: 13px; text-align: center; max-width: 420px; margin: 0; }
 .card-dash { display: block; width: 100%; margin-top: 12px; padding: 7px 10px; border: 0; border-radius: 8px; background: rgba(255,255,255,.14); color: #fff; font-weight: 700; font-size: 13px; }
 .card-dash:hover { background: rgba(255,255,255,.26); }
@@ -107,6 +116,9 @@ tr.sum td { background: var(--bg); }
 .check { background: var(--soft); border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 16px; }
 .empty { color: var(--muted); font-size: 13px; margin: 0; }
 .push { margin-left: auto; }
+.steps { margin: 10px 0 0; padding-left: 20px; font-size: 14px; }
+.steps li { margin-bottom: 6px; }
+.home-done { margin-top: 12px; width: 100%; }
 .signin .primary { margin-top: 4px; }
 
 /* Team */
@@ -128,9 +140,9 @@ table.team tr.off td { color: var(--muted); }
 <body>
 <div id="app"></div>
 <!-- Bump v= after any change so browsers don't keep running an old copy. -->
-<script src="config.js?v=4"></script>
-<script src="core.js?v=4"></script>
-<script src="store.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="config.js?v=6"></script>
+<script src="core.js?v=6"></script>
+<script src="store.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

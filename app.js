@@ -4,6 +4,12 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const app = document.getElementById('app');
 
+  // Phones can't pop out a floating counter; they get a Home Screen icon instead.
+  const ua = navigator.userAgent;
+  const isIOS = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const isPhone = isIOS || /Android/.test(ua);
+  const isHomeScreenApp = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
   let view = location.hash === '#dashboard' ? 'dashboard' : 'counter';
   let status = 'loading'; // loading | ok | noKey | badKey | offline
   const dash = { period: 'week', person: 'all', sort: { setter: { id: 'meetingsBooked', dir: -1 }, closer: { id: 'signedDeals', dir: -1 } } };
@@ -79,16 +85,53 @@
   }
 
   function counterHTML(p) {
-    const canPop = 'documentPictureInPicture' in window;
+    let button = '<button class="primary" data-act="popout">Pop out</button>';
+    let hint = 'documentPictureInPicture' in window
+      ? 'Pop out keeps a small counter on top of your other windows.'
+      : 'Pop out only works in Chrome or Edge on a computer. The counter works here either way.';
+    if (isPhone) {
+      button = isHomeScreenApp ? '' : '<button class="primary" data-act="homeScreen">Put it on my Home Screen</button>';
+      hint = isHomeScreenApp ? '' : 'Then it opens like an app, already signed in.';
+    }
     return `<div class="counter-page">
       ${cardHTML(p)}
       <div class="tools">
-        <button class="primary" data-act="popout">Pop out</button>
+        ${button}
         <label><input type="checkbox" data-role="setter" ${p.roles.includes('setter') ? 'checked' : ''}> Setter</label>
         <label><input type="checkbox" data-role="closer" ${p.roles.includes('closer') ? 'checked' : ''}> Closer</label>
       </div>
-      <p class="hint">${canPop ? 'Pop out keeps a small counter on top of your other windows.' : 'Pop out only works in Chrome or Edge. The counter works here either way.'}</p>
+      ${hint ? `<p class="hint">${hint}</p>` : ''}
     </div>`;
+  }
+
+  // Steps for the phone in hand. The key sits in the address bar only while this is open.
+  function showHomeSteps() {
+    const steps = isIOS && /CriOS/.test(ua)
+      ? ['Tap the <b>Share</b> button in the address bar.', 'Tap <b>Add to Home Screen</b>.', 'Tap <b>Add</b>.']
+      : isIOS
+        ? ['Tap the <b>Share</b> button (the square with an arrow). On newer iPhones it\'s under the <b>•••</b> button.', 'Tap <b>Add to Home Screen</b>.', 'Tap <b>Add</b>.']
+        : ['Tap the <b>⋮</b> menu at the top right of Chrome.', 'Tap <b>Add to Home screen</b> (or <b>Install app</b>), then <b>Add</b>.'];
+    Store.showKeyInAddress(true);
+    const dlg = document.createElement('dialog');
+    dlg.id = 'home';
+    dlg.className = 'info';
+    dlg.setAttribute('aria-label', 'Put it on your Home Screen');
+    dlg.innerHTML = `<div class="info-body"><div class="info-head"><h2>Put it on your Home Screen</h2>
+        <button class="info-close" data-act="homeDone" aria-label="Close">×</button></div>
+      <p class="info-item"><span>Do this from this screen so the icon opens already signed in.</span></p>
+      <ol class="steps">${steps.map((s) => `<li>${s}</li>`).join('')}</ol>
+      <button class="primary home-done" data-act="homeDone">Done</button></div>`;
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) closeHomeSteps(dlg); });
+    dlg.addEventListener('close', () => { if (dlg.isConnected) closeHomeSteps(dlg); }); // Escape key
+    document.body.append(dlg);
+    dlg.showModal();
+  }
+
+  // Takes the key back out of the address right away, not whenever the browser gets to it.
+  function closeHomeSteps(dlg) {
+    Store.showKeyInAddress(false);
+    if (dlg.open) dlg.close();
+    dlg.remove();
   }
 
   /* ---------- Dashboard ---------- */
@@ -370,6 +413,8 @@
         if (confirm("Sign out on this computer? You'll need your personal link to get back in.")) { closePip(); Store.signOut(); status = 'noKey'; render(); }
         break;
       case 'popout': popOut(); break;
+      case 'homeScreen': showHomeSteps(); break;
+      case 'homeDone': closeHomeSteps(t.closest('dialog')); break;
       case 'openDash': {
         // From the pop-out: show everyone's numbers in the main tab and bring it forward.
         dash.person = 'all';

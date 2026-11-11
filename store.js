@@ -136,6 +136,12 @@
     },
 
     linkFor(k) { return `${location.origin}${location.pathname}#k=${k}`; },
+
+    // An iPhone Home Screen icon keeps its own separate sign-in, so the key has to be
+    // in the address at the moment the icon is saved. Shown only while setting that up.
+    showKeyInAddress(on) {
+      history.replaceState(null, '', location.pathname + location.search + (on && key ? `#k=${key}` : ''));
+    },
   };
   window.Store = Store;
 })();
