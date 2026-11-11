@@ -307,7 +307,12 @@
 
   function inviteText() {
     const first = lastLink.name.split(/\s+/)[0];
-    return `Hi ${first}, here's your Kept Scorecard link: ${lastLink.url}\n\nOpen it in Chrome on your computer, then click Pop out to keep the counter on your screen. It's your personal sign-in, so keep it to yourself.`;
+    return [
+      `Hi ${first}, here's your Kept Scorecard link: ${lastLink.url}`,
+      'On your computer: open it in Chrome and click Pop out to keep the counter on your screen.',
+      'On your iPhone: open it in Safari (not inside Slack or Instagram) and tap "Put it on my Home Screen." Then tap Share (on newer iPhones it\'s under •••), Add to Home Screen, and Add. The Scorecard icon opens already signed in.',
+      "It's your personal sign-in, so keep it to yourself.",
+    ].join('\n\n');
   }
 
   async function copy(text) {
