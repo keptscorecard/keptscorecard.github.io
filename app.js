@@ -23,15 +23,39 @@
   ];
   const roleText = (roles) => roles.map((r) => (r === 'setter' ? 'Setter' : 'Closer')).join(' + ');
 
-  // The counter shows today only and starts fresh at midnight. Past days live on the Dashboard.
-  function todayValues(p) {
-    return Core.sumRange(Store.counts()[p.id], today(), today());
+  // The counter shows one day, today unless someone picks an earlier day to fix a missed tap.
+  // Only the last 7 days can be changed. It drifts back to today after a few idle minutes so
+  // nobody logs today's work on yesterday by mistake.
+  const EDIT_DAYS = 7;
+  const EDIT_IDLE_MS = 3 * 60 * 1000;
+  let editDay = null; // null means today
+  let editTimer = null;
+  const shownDay = () => editDay || today();
+
+  function setEditDay(day) {
+    editDay = day && day !== today() ? day : null;
+    clearTimeout(editTimer);
+    if (editDay) editTimer = setTimeout(() => { editDay = null; refreshCounter(); toast('Back to today.'); }, EDIT_IDLE_MS);
+  }
+
+  function dayValues(p) {
+    return Core.sumRange(Store.counts()[p.id], shownDay(), shownDay());
+  }
+
+  function dayPickerHTML() {
+    const t = today();
+    const options = Core.daysThrough(t, EDIT_DAYS).map((d, i) => {
+      const label = i === 0 ? `Today · ${Core.dayLabel(d)}` : i === 1 ? `Yesterday · ${Core.dayLabel(d)}` : Core.dayLabel(d);
+      return `<option value="${d}" ${d === shownDay() ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+    return `<select class="day-pick" data-act="day" aria-label="Which day you're logging">${options}</select>`;
   }
 
   /* ---------- Counter card (used on the page and in the pop-out) ---------- */
   function cardHTML(p, inPip = false) {
-    const values = todayValues(p);
-    let html = `<div class="card-head"><span class="card-name"><span class="card-title">${esc(p.name)}</span><button class="i" data-act="info" aria-label="What each number means">i</button></span><span class="card-week">Today · ${Core.dayLabel(today())}</span></div>`;
+    const values = dayValues(p);
+    let html = `<div class="card-head"><span class="card-name"><span class="card-title">${esc(p.name)}</span><button class="i" data-act="info" aria-label="What each number means">i</button></span>${dayPickerHTML()}</div>`;
+    if (editDay) html += `<div class="past-note"><span>Fixing ${Core.dayLabel(editDay)}</span><button data-act="backToday">Back to today</button></div>`;
     let group = null;
     for (const m of metricsFor(p)) {
       if (m.group !== group) { group = m.group; html += `<div class="group">${group}</div>`; }
@@ -43,13 +67,19 @@
     }
     // Only the pop-out gets this; the page already has the Dashboard tab up top.
     if (inPip) html += '<button class="card-dash" data-act="openDash">Team dashboard</button>';
-    return `<div class="card">${html}</div>`;
+    return `<div class="card${editDay ? ' past' : ''}">${html}</div>`;
+  }
+
+  // Redraws the counter wherever it's showing, after switching days.
+  function refreshCounter() {
+    if (view === 'counter') render();
+    renderPip();
   }
 
   function syncCounts() {
     const p = Store.current();
     if (!p) return;
-    const values = todayValues(p);
+    const values = dayValues(p);
     const docs = [document];
     if (pipWindow) docs.push(pipWindow.document);
     for (const doc of docs) {
@@ -68,14 +98,17 @@
     if (!('documentPictureInPicture' in window)) { toast('Pop out needs Chrome or Edge.'); return; }
     const source = app.querySelector('.card');
     try {
-      // +44 leaves room for the Team dashboard button, which the page's card doesn't have.
-      const win = await documentPictureInPicture.requestWindow({ width: 300, height: Math.ceil(source.offsetHeight) + 8 + 44 });
+      // +44 leaves room for the Team dashboard button, which the page's card doesn't have,
+      // and +36 for the "Fixing an earlier day" line when it's showing.
+      const extra = source.classList.contains('past') ? 0 : 36;
+      const win = await documentPictureInPicture.requestWindow({ width: 300, height: Math.ceil(source.offsetHeight) + 8 + 44 + extra });
       const style = win.document.createElement('style');
       style.textContent = document.getElementById('css').textContent;
       win.document.head.append(style);
       win.document.title = 'Scorecard';
       win.document.body.className = 'pip';
       win.document.addEventListener('click', onClick);
+      win.document.addEventListener('change', onChange);
       win.addEventListener('pagehide', () => { pipWindow = null; });
       pipWindow = win;
       renderPip();
@@ -347,8 +380,9 @@
       body += `<p class="info-item"><b>${m.label}</b><span>${esc(m.def)}</span></p>`;
     }
     const rule = roles.includes('setter') ? `<p class="info-rule">${esc(Core.DEALS_RULE)}</p>` : '';
+    const missed = '<p class="info-rule">Forgot to tap? Pick the day at the top of the counter. You can fix any of the last 7 days.</p>';
     return `<div class="info-body"><div class="info-head"><h2>What each number means</h2>
-      <button class="info-close" data-act="closeInfo" aria-label="Close">×</button></div>${body}${rule}</div>`;
+      <button class="info-close" data-act="closeInfo" aria-label="Close">×</button></div>${body}${rule}${missed}</div>`;
   }
 
   // Opens in whichever window was clicked, so it works inside the pop-out too.
@@ -424,9 +458,14 @@
     switch (d.act) {
       case 'bump': {
         const p = Store.current();
-        if (p && Store.bump(p.id, d.m, Number(d.d), today())) { syncCounts(); if (view === 'dashboard') render(); }
+        if (p && Store.bump(p.id, d.m, Number(d.d), shownDay(), today())) {
+          if (editDay) setEditDay(editDay); // still fixing that day, so restart the idle clock
+          syncCounts();
+          if (view === 'dashboard') render();
+        }
         break;
       }
+      case 'backToday': setEditDay(null); refreshCounter(); break;
       case 'nav': setView(d.v); break;
       case 'signout':
         if (confirm("Sign out on this computer? You'll need your personal link to get back in.")) { closePip(); Store.signOut(); status = 'noKey'; render(); }
@@ -477,7 +516,9 @@
 
   document.addEventListener('click', onClick);
 
-  document.addEventListener('change', (e) => {
+  // Also wired into the pop-out, so the day picker works there.
+  function onChange(e) {
+    if (e.target.dataset && e.target.dataset.act === 'day') { setEditDay(e.target.value); refreshCounter(); return; }
     if (e.target.id === 'personFilter') { dash.person = e.target.value; render(); return; }
     const role = e.target.dataset && e.target.dataset.role;
     if (!role) return;
@@ -487,7 +528,9 @@
     Store.setRoles(p.id, roles);
     render();
     renderPip();
-  });
+  }
+
+  document.addEventListener('change', onChange);
 
   document.addEventListener('submit', async (e) => {
     if (e.target.id !== 'teamAdd') return;
@@ -512,10 +555,12 @@
   });
 
   // Other people's taps show up on their own. Typing on the Team page is never interrupted.
+  // An open day picker isn't redrawn either, or it would snap shut mid-choice.
+  const pickingDay = (doc) => !!(doc && doc.activeElement && doc.activeElement.classList.contains('day-pick'));
   Store.on('change', () => {
     const typing = document.activeElement && /^(INPUT|SELECT)$/.test(document.activeElement.tagName);
-    if (!(view === 'team' && typing)) render();
-    renderPip();
+    if (!(view === 'team' && typing) && !pickingDay(document)) render();
+    if (!pickingDay(pipWindow && pipWindow.document)) renderPip();
   });
   Store.on('error', (err) => {
     if (err.kind === 'badKey') { status = 'badKey'; Store.signOut(); render(); return; }
@@ -530,7 +575,7 @@
   // Starts the counter fresh at midnight, even if the page stays open.
   setInterval(() => {
     const now = today();
-    if (now !== lastDay) { lastDay = now; render(); renderPip(); }
+    if (now !== lastDay) { lastDay = now; setEditDay(null); render(); renderPip(); }
   }, 60000);
 
   Store.init();

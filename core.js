@@ -94,19 +94,19 @@
     return out;
   }
 
-  // The counter is daily: a plus lands on today and a minus only takes back today's taps.
-  // (The database's minus removes the latest tap this week, which is today's whenever today has one.)
-  function bump(personCounts, metric, delta, today) {
+  // The counter is daily: a plus or minus lands on exactly the day being shown
+  // (today, or one of the 6 days before it when fixing a missed tap).
+  function bump(personCounts, metric, delta, day) {
     const days = personCounts;
     if (delta > 0) {
-      days[today] = days[today] || {};
-      days[today][metric] = (days[today][metric] || 0) + delta;
+      days[day] = days[day] || {};
+      days[day][metric] = (days[day][metric] || 0) + delta;
       return true;
     }
-    if (!days[today] || !(days[today][metric] > 0)) return false;
-    days[today][metric] -= 1;
-    if (days[today][metric] === 0) delete days[today][metric];
-    if (Object.keys(days[today]).length === 0) delete days[today];
+    if (!days[day] || !(days[day][metric] > 0)) return false;
+    days[day][metric] -= 1;
+    if (days[day][metric] === 0) delete days[day][metric];
+    if (Object.keys(days[day]).length === 0) delete days[day];
     return true;
   }
 

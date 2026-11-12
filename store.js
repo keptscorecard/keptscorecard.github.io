@@ -93,11 +93,12 @@
     current: () => (state.me ? Store.person(state.me.id) || state.me : null),
     isAdmin: () => !!(state.me && state.me.isAdmin),
 
-    bump(id, metric, delta, today) {
-      const changed = Core.bump(personCounts(id), metric, delta, today);
+    // day is the day being shown (today, or up to 6 days back); today is the device's date.
+    bump(id, metric, delta, day, today) {
+      const changed = Core.bump(personCounts(id), metric, delta, day);
       if (!changed) return false;
       version++;
-      send('sc_bump', { p_key: key, p_metric: metric, p_delta: delta, p_today: today }).catch(async (e) => {
+      send('sc_bump_day', { p_key: key, p_metric: metric, p_delta: delta, p_day: day, p_today: today }).catch(async (e) => {
         emit('error', e);
         if (await Store.load() === 'ok') emit('change');
       });
