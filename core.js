@@ -43,8 +43,19 @@
       : `${MONTHS[a.getMonth()]} ${a.getDate()}–${MONTHS[b.getMonth()]} ${b.getDate()}`;
   }
 
+  // "Wed, Nov 11", "Nov 3–9", "Oct 28–Nov 3", or with years when the range crosses one.
+  function rangeText(from, to) {
+    if (from === to) return dayLabel(from);
+    const a = parseKey(from), b = parseKey(to);
+    if (a.getFullYear() !== b.getFullYear()) return `${short(from)}, ${a.getFullYear()}–${short(to)}, ${b.getFullYear()}`;
+    return a.getMonth() === b.getMonth() ? `${short(from)}–${b.getDate()}` : `${short(from)}–${short(to)}`;
+  }
+
+  const dayCount = (from, to) => Math.round((parseKey(to) - parseKey(from)) / 86400000) + 1;
+
   function periodRange(kind, today) {
     if (kind === 'today') return [today, today];
+    if (kind === 'yesterday') { const y = addDays(today, -1); return [y, y]; }
     if (kind === 'week') { const s = weekStart(today); return [s, addDays(s, 6)]; }
     if (kind === 'mtd') return [monthStart(today), today];
     return ['0000-01-01', '9999-12-31'];
@@ -110,6 +121,6 @@
     return true;
   }
 
-  const api = { SETTER_METRICS, CLOSER_METRICS, CLOSER_RATES, DEALS_RULE, dateKey, parseKey, addDays, weekStart, monthStart, short, monthName, dayLabel, weekLabel, periodRange, sumRange, addInto, rate, firstDay, weeksThrough, daysThrough, bump };
+  const api = { SETTER_METRICS, CLOSER_METRICS, CLOSER_RATES, DEALS_RULE, dateKey, parseKey, addDays, weekStart, monthStart, short, monthName, dayLabel, weekLabel, rangeText, dayCount, periodRange, sumRange, addInto, rate, firstDay, weeksThrough, daysThrough, bump };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.Core = api;
 })(typeof window !== 'undefined' ? window : globalThis);

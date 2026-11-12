@@ -12,7 +12,8 @@
 
   let view = location.hash === '#dashboard' ? 'dashboard' : 'counter';
   let status = 'loading'; // loading | ok | noKey | badKey | offline
-  const dash = { period: 'today', person: 'all', sort: { setter: { id: 'meetingsBooked', dir: -1 }, closer: { id: 'signedDeals', dir: -1 } } };
+  // from/to are only used by the "Date range" period, and stay put when switching away and back.
+  const dash = { period: 'today', from: null, to: null, person: 'all', sort: { setter: { id: 'meetingsBooked', dir: -1 }, closer: { id: 'signedDeals', dir: -1 } } };
   let pipWindow = null;
   let lastDay = today();
   let lastLink = null; // { name, url } after adding someone or making a new link
@@ -255,9 +256,28 @@
     </section>`;
   }
 
+  // The dates the dashboard is adding up. A typed range that runs backwards still works.
+  function dashRange() {
+    if (dash.period !== 'custom') return Core.periodRange(dash.period, today());
+    return dash.from <= dash.to ? [dash.from, dash.to] : [dash.to, dash.from];
+  }
+
+  // The first time someone opens "Date range", it starts on whatever they were looking at.
+  function startCustomRange() {
+    if (dash.from) return;
+    const t = today();
+    let [from, to] = Core.periodRange(dash.period, t);
+    if (dash.period === 'all') from = Core.firstDay(Store.counts()) || t;
+    if (to > t) to = t;
+    dash.from = from;
+    dash.to = to;
+  }
+
   function rangeLabel(from, to) {
     const t = today();
     if (dash.period === 'today') return `Today · ${Core.dayLabel(t)}`;
+    if (dash.period === 'yesterday') return `Yesterday · ${Core.dayLabel(from)}`;
+    if (dash.period === 'custom') { const n = Core.dayCount(from, to); return `${Core.rangeText(from, to)} · ${n} day${n === 1 ? '' : 's'}`; }
     if (dash.period === 'week') return `This week · ${Core.weekLabel(Core.weekStart(t))}`;
     if (dash.period === 'mtd') return from === t ? `Month to date · ${Core.short(t)}` : `Month to date · ${Core.short(from)}–${Core.parseKey(t).getDate()}`;
     const first = Core.firstDay(Store.counts());
@@ -276,21 +296,40 @@
   function dashboardHTML() {
     const people = Store.people();
     if (dash.person !== 'all' && !Store.person(dash.person)) dash.person = 'all';
-    const scoped = people.filter((p) => dash.person === 'all' || p.id === dash.person);
-    const setters = scoped.filter((p) => p.roles.includes('setter'));
-    const closers = scoped.filter((p) => p.roles.includes('closer'));
-    const [from, to] = Core.periodRange(dash.period, today());
-    const periods = [['today', 'Today'], ['week', 'This week'], ['mtd', 'Month to date'], ['all', 'All time']];
+    const periods = [['today', 'Today'], ['yesterday', 'Yesterday'], ['week', 'This week'], ['mtd', 'Month to date'], ['all', 'All time'], ['custom', 'Date range']];
     const options = [`<option value="all">Everyone</option>`, ...people.map((p) => `<option value="${esc(p.id)}" ${p.id === dash.person ? 'selected' : ''}>${esc(p.name)}</option>`)].join('');
+    const t = today();
+    const dates = dash.period === 'custom'
+      ? `<div class="dates">
+          <label>From <input type="date" id="rangeFrom" value="${dash.from}" max="${t}"></label>
+          <label>To <input type="date" id="rangeTo" value="${dash.to}" max="${t}"></label>
+        </div>`
+      : '';
     return `<div class="filters">
         <div class="seg" role="group" aria-label="Period">${periods.map(([k, l]) => `<button data-act="period" data-p="${k}" aria-pressed="${dash.period === k}">${l}</button>`).join('')}</div>
+        ${dates}
         <select id="personFilter" aria-label="Filter by person">${options}</select>
         <button class="ghost push" data-act="download">Download all numbers</button>
       </div>
-      <p class="range">${rangeLabel(from, to)}</p>
+      <div id="dashBody">${dashBodyHTML()}</div>`;
+  }
+
+  // Everything under the filters. Redrawn on its own while someone is picking dates,
+  // so the date box they're typing in isn't wiped out.
+  function dashBodyHTML() {
+    const scoped = Store.people().filter((p) => dash.person === 'all' || p.id === dash.person);
+    const setters = scoped.filter((p) => p.roles.includes('setter'));
+    const closers = scoped.filter((p) => p.roles.includes('closer'));
+    const [from, to] = dashRange();
+    return `<p class="range">${rangeLabel(from, to)}</p>
       ${checkLine(setters, closers, from, to)}
       ${roleBlock('setter', 'Setters', setters, from, to)}
       ${roleBlock('closer', 'Closers', closers, from, to)}`;
+  }
+
+  function renderDashBody() {
+    const body = document.getElementById('dashBody');
+    if (body) body.innerHTML = dashBodyHTML();
   }
 
   // Every tap ever logged, one row per person, day and number, for a backup or a spreadsheet.
@@ -484,7 +523,11 @@
       }
       case 'info': showInfo(t.ownerDocument, t.closest('.card') ? Store.current().roles : ['setter', 'closer']); break;
       case 'closeInfo': t.closest('dialog').close(); break;
-      case 'period': dash.period = d.p; render(); break;
+      case 'period':
+        if (d.p === 'custom') startCustomRange();
+        dash.period = d.p;
+        render();
+        break;
       case 'sort': {
         const s = dash.sort[d.role];
         if (s.id === d.col) s.dir *= -1; else { s.id = d.col; s.dir = -1; }
@@ -520,6 +563,12 @@
   function onChange(e) {
     if (e.target.dataset && e.target.dataset.act === 'day') { setEditDay(e.target.value); refreshCounter(); return; }
     if (e.target.id === 'personFilter') { dash.person = e.target.value; render(); return; }
+    if (e.target.id === 'rangeFrom' || e.target.id === 'rangeTo') {
+      if (!e.target.value) return; // half-typed date
+      dash[e.target.id === 'rangeFrom' ? 'from' : 'to'] = e.target.value;
+      renderDashBody();
+      return;
+    }
     const role = e.target.dataset && e.target.dataset.role;
     if (!role) return;
     const p = Store.current();
@@ -559,7 +608,8 @@
   const pickingDay = (doc) => !!(doc && doc.activeElement && doc.activeElement.classList.contains('day-pick'));
   Store.on('change', () => {
     const typing = document.activeElement && /^(INPUT|SELECT)$/.test(document.activeElement.tagName);
-    if (!(view === 'team' && typing) && !pickingDay(document)) render();
+    if (view === 'dashboard' && typing) renderDashBody(); // keeps the date boxes and person filter as they are
+    else if (!(view === 'team' && typing) && !pickingDay(document)) render();
     if (!pickingDay(pipWindow && pipWindow.document)) renderPip();
   });
   Store.on('error', (err) => {

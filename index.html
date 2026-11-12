@@ -100,6 +100,11 @@ form.add label { display: inline-flex; gap: 5px; align-items: center; }
 /* Dashboard */
 .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 6px; }
 .filters select { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.filters .seg { flex-wrap: wrap; } /* six periods don't fit across a phone */
+.dates { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.dates label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.dates input { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; color-scheme: light dark; }
+@media (pointer: coarse) { .dates input { font-size: 16px; } } /* stops iPhones zooming in */
 .range { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
 .panel h2 { margin: 0 0 12px; font-size: 18px; letter-spacing: -0.01em; }
@@ -150,9 +155,9 @@ table.team tr.off td { color: var(--muted); }
 <body>
 <div id="app"></div>
 <!-- Bump v= after any change so browsers don't keep running an old copy. -->
-<script src="config.js?v=10"></script>
-<script src="core.js?v=10"></script>
-<script src="store.js?v=10"></script>
-<script src="app.js?v=10"></script>
+<script src="config.js?v=11"></script>
+<script src="core.js?v=11"></script>
+<script src="store.js?v=11"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>
