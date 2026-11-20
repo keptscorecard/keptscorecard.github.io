@@ -1,0 +1,35 @@
+name: Keep the database awake
+
+# Supabase pauses free projects after 7 days with no use. Twice a week this
+# asks the database one harmless question with a made-up key, so it reads
+# nothing, but it counts as use. If the database doesn't answer, this run
+# fails and GitHub emails the repo admins.
+on:
+  schedule:
+    - cron: '0 16 * * 1,4'   # Mon and Thu, 9 AM Utah time in winter (10 AM in summer)
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ask the database one question
+        run: |
+          url=$(sed -nE "s/^ *url: '([^']+)'.*/\1/p" config.js)
+          key=$(sed -nE "s/^ *key: '([^']+)'.*/\1/p" config.js)
+          body=$(curl -sS -m 60 -X POST "$url/rest/v1/rpc/sc_data" \
+            -H "apikey: $key" -H "Content-Type: application/json" \
+            -d '{"p_key":"keep-awake-ping"}')
+          echo "$body"
+          # "bad_key" means the database ran the check, which is all we need.
+          echo "$body" | grep -q '"bad_key"'
+      - name: Keep this schedule switched on
+        # GitHub switches off schedules in repos with no changes for 60 days.
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keep-awake.yml/enable"
+        env:
+          GH_TOKEN: ${{ github.token }}
